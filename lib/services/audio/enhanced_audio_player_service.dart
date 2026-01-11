@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:just_audio/just_audio.dart';
-import 'package:just_audio_background/just_audio_background.dart';
 import 'package:rxdart/rxdart.dart';
 import '../../data/models/song_model.dart';
 import '../../domain/entities/queue_state.dart';
@@ -401,28 +400,17 @@ class EnhancedAudioPlayerService {
       'Referer': 'https://www.youtube.com/',
     };
 
+    debugPrint(
+        'EnhancedAudioPlayer: Creating audio source for ${track.title}, local: $isLocal');
+    debugPrint(
+        'EnhancedAudioPlayer: URL: ${url.substring(0, url.length > 80 ? 80 : url.length)}...');
+
     if (isLocal) {
-      return AudioSource.file(
-        url,
-        tag: MediaItem(
-          id: track.id,
-          title: track.title,
-          artist: track.artist,
-          duration: track.duration,
-          artUri: Uri.parse(track.thumbnailUrl),
-        ),
-      );
+      return AudioSource.file(url);
     } else {
       return AudioSource.uri(
         Uri.parse(url),
         headers: headers,
-        tag: MediaItem(
-          id: track.id,
-          title: track.title,
-          artist: track.artist,
-          duration: track.duration,
-          artUri: Uri.parse(track.thumbnailUrl),
-        ),
       );
     }
   }
