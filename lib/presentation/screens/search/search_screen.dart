@@ -3,11 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'dart:ui';
+import '../../widgets/animated_list_item.dart';
+import '../../widgets/playing_indicator.dart';
 import '../../../data/datasources/remote/youtube_service.dart';
 import '../../../data/models/song_model.dart';
 import '../../../data/models/playlist_model.dart';
 import '../../controllers/enhanced_player_controller.dart';
 
+/// SakSid Music - Glass Search Screen
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
 
@@ -19,17 +23,27 @@ class _SearchScreenState extends State<SearchScreen> {
   final YouTubeService _youtubeService = YouTubeService();
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _focusNode = FocusNode();
+
   List<SongModel> _searchResults = [];
   bool _isLoading = false;
   String? _error;
   Timer? _debounce;
-
-  // Recent searches (could be persisted later)
   final List<String> _recentSearches = [];
+
+  static const Color _accent = Color(0xFFE50914);
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _searchController.dispose();
+    _focusNode.dispose();
+    _youtubeService.dispose();
+    super.dispose();
+  }
 
   void _onSearchChanged(String query) {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
-    _debounce = Timer(const Duration(milliseconds: 500), () {
+    _debounce = Timer(const Duration(milliseconds: 600), () {
       if (query.isNotEmpty) {
         _performSearch(query);
       } else {
@@ -49,80 +63,118 @@ class _SearchScreenState extends State<SearchScreen> {
 
     try {
       final results = await _youtubeService.searchSongs('$query music');
-      setState(() {
-        _searchResults = results;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _searchResults = results;
+          _isLoading = false;
+        });
 
-      // Add to recent searches
-      if (!_recentSearches.contains(query)) {
-        _recentSearches.insert(0, query);
-        if (_recentSearches.length > 5) {
-          _recentSearches.removeLast();
+        if (!_recentSearches.contains(query)) {
+          _recentSearches.insert(0, query);
+          if (_recentSearches.length > 5) _recentSearches.removeLast();
         }
       }
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-        _error = 'Search failed. Please try again.';
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _error = 'Search failed. Please try again.';
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF000000),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Search Bar
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: TextField(
-                controller: _searchController,
-                focusNode: _focusNode,
-                onChanged: _onSearchChanged,
-                style: const TextStyle(color: Colors.black),
-                decoration: InputDecoration(
-                  hintText: 'Search for songs, artists...',
-                  hintStyle: TextStyle(color: Colors.grey[600]),
-                  prefixIcon: const Icon(Icons.search, color: Colors.grey),
-                  suffixIcon: _searchController.text.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear, color: Colors.grey),
-                          onPressed: () {
-                            _searchController.clear();
-                            setState(() {
-                              _searchResults = [];
-                              _error = null;
-                            });
-                          },
-                        )
-                      : null,
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(vertical: 14),
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: [
+          // Dynamic Background
+          Positioned.fill(
+            child: Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Colors.black, Color(0xFF050505), Colors.black],
                 ),
-                textInputAction: TextInputAction.search,
-                onSubmitted: (value) {
-                  if (value.isNotEmpty) {
-                    _performSearch(value);
-                    _focusNode.unfocus();
-                  }
-                },
+              ),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+                child: Container(color: Colors.black.withOpacity(0.8)),
               ),
             ),
+          ),
 
-            // Content
-            Expanded(
-              child: _buildContent(),
+          SafeArea(
+            child: Column(
+              children: [
+                const SizedBox(height: 16),
+                // Floating Glass Search Bar
+                _buildGlassSearchBar(),
+
+                const SizedBox(height: 16),
+
+                // Content Area
+                Expanded(
+                  child: _buildContent(),
+                ),
+              ],
             ),
-          ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGlassSearchBar() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          child: TextField(
+            controller: _searchController,
+            focusNode: _focusNode,
+            onChanged: _onSearchChanged,
+            style: const TextStyle(color: Colors.white, fontSize: 16),
+            decoration: InputDecoration(
+              hintText: 'Search songs, artists...',
+              hintStyle: TextStyle(color: Colors.white.withOpacity(0.4)),
+              prefixIcon: const Icon(Icons.search_rounded, color: _accent),
+              suffixIcon: _searchController.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.close_rounded,
+                          color: Colors.white54),
+                      onPressed: () {
+                        _searchController.clear();
+                        setState(() {
+                          _searchResults = [];
+                          _error = null;
+                        });
+                      },
+                    )
+                  : null,
+              border: InputBorder.none,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            ),
+            cursorColor: _accent,
+          ),
         ),
       ),
     );
@@ -130,36 +182,16 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Widget _buildContent() {
     if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(color: Color(0xFFDC143C)),
+      return Center(
+        child: CircularProgressIndicator(
+          valueColor: const AlwaysStoppedAnimation<Color>(_accent),
+          strokeWidth: 3,
+        ),
       );
     }
 
     if (_error != null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error_outline, size: 64, color: Colors.grey),
-            const SizedBox(height: 16),
-            Text(
-              _error!,
-              style: TextStyle(color: Colors.grey[400]),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: () => _performSearch(_searchController.text),
-              icon: const Icon(Icons.refresh),
-              label: const Text('Retry'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFDC143C),
-                foregroundColor: Colors.white,
-              ),
-            ),
-          ],
-        ),
-      );
+      return _buildErrorState();
     }
 
     if (_searchResults.isEmpty && _searchController.text.isEmpty) {
@@ -168,22 +200,9 @@ class _SearchScreenState extends State<SearchScreen> {
 
     if (_searchResults.isEmpty) {
       return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.search_off, size: 64, color: Colors.grey[600]),
-            const SizedBox(height: 16),
-            Text(
-              'No results found for "${_searchController.text}"',
-              style: TextStyle(color: Colors.grey[400]),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Try a different search term',
-              style: TextStyle(color: Colors.grey[600], fontSize: 12),
-            ),
-          ],
+        child: Text(
+          'No results found',
+          style: TextStyle(color: Colors.white.withOpacity(0.5)),
         ),
       );
     }
@@ -191,11 +210,15 @@ class _SearchScreenState extends State<SearchScreen> {
     return Consumer<EnhancedPlayerController>(
       builder: (context, controller, child) {
         return ListView.builder(
-          padding: const EdgeInsets.only(bottom: 160),
+          padding: const EdgeInsets.only(bottom: 120),
+          physics: const BouncingScrollPhysics(),
           itemCount: _searchResults.length,
           itemBuilder: (context, index) {
             final song = _searchResults[index];
-            return _buildSongTile(song, controller);
+            return AnimatedListItem(
+              index: index,
+              child: _buildSongTile(song, controller, index),
+            );
           },
         );
       },
@@ -204,77 +227,56 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Widget _buildEmptyState() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Recent Searches
           if (_recentSearches.isNotEmpty) ...[
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Recent Searches',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                TextButton(
-                  onPressed: () => setState(() => _recentSearches.clear()),
-                  child: const Text(
-                    'Clear',
-                    style: TextStyle(color: Color(0xFFDC143C)),
-                  ),
-                ),
-              ],
+            Text(
+              'Recent',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.9),
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             const SizedBox(height: 12),
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: _recentSearches
-                  .map((query) => ActionChip(
-                        label: Text(query),
-                        backgroundColor: const Color(0xFF2A2A2A),
-                        labelStyle: const TextStyle(color: Colors.white),
-                        onPressed: () {
-                          _searchController.text = query;
-                          _performSearch(query);
-                        },
-                      ))
+                  .map((query) => _buildGlassChip(query))
                   .toList(),
             ),
             const SizedBox(height: 32),
           ],
 
-          // Browse Categories
-          const Text(
-            'Browse Categories',
+          // Categories
+          Text(
+            'Browse',
             style: TextStyle(
-              color: Colors.white,
+              color: Colors.white.withOpacity(0.9),
               fontSize: 18,
               fontWeight: FontWeight.bold,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           GridView.count(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             crossAxisCount: 2,
-            mainAxisSpacing: 12,
-            crossAxisSpacing: 12,
-            childAspectRatio: 2.5,
+            mainAxisSpacing: 16,
+            crossAxisSpacing: 16,
+            childAspectRatio: 1.6,
             children: [
-              _buildCategoryChip('Pop', Colors.pink),
-              _buildCategoryChip('Hip Hop', Colors.orange),
-              _buildCategoryChip('Rock', Colors.red),
-              _buildCategoryChip('EDM', Colors.purple),
-              _buildCategoryChip('R&B', Colors.blue),
-              _buildCategoryChip('Jazz', Colors.teal),
-              _buildCategoryChip('Classical', Colors.brown),
-              _buildCategoryChip('Bollywood', Colors.amber),
+              _buildCategoryCard('Pop', const Color(0xFFE91E63)),
+              _buildCategoryCard('Hip Hop', const Color(0xFFFFA726)),
+              _buildCategoryCard('Rock', const Color(0xFFD32F2F)),
+              _buildCategoryCard('EDM', const Color(0xFF9C27B0)),
+              _buildCategoryCard('lo-fi', const Color(0xFF26A69A)),
+              _buildCategoryCard('Indie', const Color(0xFF5C6BC0)),
             ],
           ),
         ],
@@ -282,7 +284,36 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  Widget _buildCategoryChip(String label, Color color) {
+  Widget _buildGlassChip(String label) {
+    return GestureDetector(
+      onTap: () {
+        _searchController.text = label;
+        _performSearch(label);
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white.withOpacity(0.1)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.history_rounded, color: Colors.white54, size: 16),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style:
+                  TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 13),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategoryCard(String label, Color color) {
     return GestureDetector(
       onTap: () {
         _searchController.text = label;
@@ -290,80 +321,158 @@ class _SearchScreenState extends State<SearchScreen> {
       },
       child: Container(
         decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
           gradient: LinearGradient(
-            colors: [color, color.withOpacity(0.6)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
+            colors: [
+              color.withOpacity(0.8),
+              color.withOpacity(0.4),
+            ],
           ),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Center(
-          child: Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
+          boxShadow: [
+            BoxShadow(
+              color: color.withOpacity(0.3),
+              blurRadius: 15,
+              offset: const Offset(0, 8),
             ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: Stack(
+            children: [
+              Positioned(
+                right: -20,
+                bottom: -20,
+                child: Transform.rotate(
+                  angle: 0.4,
+                  child: Icon(
+                    Icons.music_note_rounded,
+                    size: 100,
+                    color: Colors.white.withOpacity(0.2),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 
-  Widget _buildSongTile(SongModel song, EnhancedPlayerController controller) {
+  Widget _buildSongTile(
+      SongModel song, EnhancedPlayerController controller, int index) {
     final isCurrentSong = controller.currentSong?.id == song.id;
     final isFavorite = controller.isFavorite(song.id);
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      decoration: BoxDecoration(
+        color: isCurrentSong ? _accent.withOpacity(0.1) : Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        border:
+            isCurrentSong ? Border.all(color: _accent.withOpacity(0.3)) : null,
+      ),
       child: Material(
-        color: isCurrentSong ? const Color(0xFFDC143C).withOpacity(0.2) : Colors.transparent,
-        borderRadius: BorderRadius.circular(8),
+        color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(8),
-          onTap: () {
-            controller.playPlaylist(_searchResults, startIndex: _searchResults.indexOf(song));
-          },
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => controller.playPlaylist(_searchResults,
+              startIndex: _searchResults.indexOf(song)),
           child: Padding(
             padding: const EdgeInsets.all(8),
             child: Row(
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: CachedNetworkImage(
-                    imageUrl: song.thumbnailUrl,
-                    width: 56,
-                    height: 56,
-                    fit: BoxFit.cover,
-                    placeholder: (context, url) => Container(
-                      color: Colors.grey[800],
-                      child: const Icon(Icons.music_note, color: Colors.white54),
+                Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Hero(
+                      tag: 'search_img_${song.id}',
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: CachedNetworkImage(
+                          imageUrl: song.thumbnailUrl,
+                          width: 56,
+                          height: 56,
+                          fit: BoxFit.cover,
+                          placeholder: (_, __) =>
+                              Container(color: Colors.white10),
+                        ),
+                      ),
                     ),
-                    errorWidget: (context, url, error) => Container(
-                      color: Colors.grey[800],
-                      child: const Icon(Icons.music_note, color: Colors.white54),
-                    ),
-                  ),
+                    if (isCurrentSong && controller.isPlaying)
+                      Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.5),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Center(
+                          child: PlayingIndicator(size: 20, color: _accent),
+                        ),
+                      ),
+                  ],
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        song.title,
-                        style: TextStyle(
-                          color: isCurrentSong ? const Color(0xFFDC143C) : Colors.white,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      Row(
+                        children: [
+                          if (isCurrentSong)
+                            Container(
+                              margin: const EdgeInsets.only(right: 6),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: _accent.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(
+                                    color: _accent.withOpacity(0.5),
+                                    width: 0.5),
+                              ),
+                              child: const Text(
+                                'PLAYING',
+                                style: TextStyle(
+                                  color: _accent,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          Flexible(
+                            child: Text(
+                              song.title,
+                              style: TextStyle(
+                                color: isCurrentSong ? _accent : Colors.white,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 4),
                       Text(
                         song.artist,
-                        style: TextStyle(color: Colors.grey[400], fontSize: 13),
+                        style: TextStyle(
+                            color: Colors.white.withOpacity(0.5), fontSize: 13),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -372,22 +481,17 @@ class _SearchScreenState extends State<SearchScreen> {
                 ),
                 IconButton(
                   icon: Icon(
-                    isFavorite ? Icons.favorite : Icons.favorite_border,
-                    color: isFavorite ? const Color(0xFFDC143C) : Colors.white54,
-                    size: 20,
+                    isFavorite
+                        ? Icons.favorite_rounded
+                        : Icons.favorite_border_rounded,
+                    color: isFavorite ? _accent : Colors.white24,
+                    size: 22,
                   ),
-                  onPressed: () async {
-                    final result = await controller.toggleFavorite(song);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(result ? 'Added to favorites' : 'Removed from favorites'),
-                        duration: const Duration(seconds: 1),
-                      ),
-                    );
-                  },
+                  onPressed: () => controller.toggleFavorite(song),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.more_vert, color: Colors.white54),
+                  icon: const Icon(Icons.more_vert_rounded,
+                      color: Colors.white24),
                   onPressed: () => _showSongOptions(song, controller),
                 ),
               ],
@@ -399,271 +503,59 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   void _showSongOptions(SongModel song, EnhancedPlayerController controller) {
-    final isFavorite = controller.isFavorite(song.id);
-    final playlists = controller.getAllPlaylists();
-
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF1A1A1A),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (context) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const SizedBox(height: 8),
-          Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.grey[600],
-              borderRadius: BorderRadius.circular(2),
-            ),
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+          decoration: const BoxDecoration(
+            color: Color(0xFF1A1A1A),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
-          const SizedBox(height: 8),
-          ListTile(
-            leading: ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: CachedNetworkImage(
-                imageUrl: song.thumbnailUrl,
-                width: 48,
-                height: 48,
-                fit: BoxFit.cover,
-              ),
-            ),
-            title: Text(song.title, style: const TextStyle(color: Colors.white)),
-            subtitle: Text(song.artist, style: TextStyle(color: Colors.grey[400])),
-          ),
-          const Divider(color: Colors.grey),
-          ListTile(
-            leading: const Icon(Icons.play_arrow, color: Colors.white),
-            title: const Text('Play', style: TextStyle(color: Colors.white)),
-            onTap: () {
-              Navigator.pop(context);
-              controller.playSong(song);
-            },
-          ),
-          ListTile(
-            leading: Icon(
-              isFavorite ? Icons.favorite : Icons.favorite_border,
-              color: isFavorite ? const Color(0xFFDC143C) : Colors.white,
-            ),
-            title: Text(
-              isFavorite ? 'Remove from Favorites' : 'Add to Favorites',
-              style: const TextStyle(color: Colors.white),
-            ),
-            onTap: () async {
-              Navigator.pop(context);
-              final result = await controller.toggleFavorite(song);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(result ? 'Added to favorites' : 'Removed from favorites'),
-                  duration: const Duration(seconds: 1),
-                ),
-              );
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.playlist_add, color: Colors.white),
-            title: const Text('Add to Playlist', style: TextStyle(color: Colors.white)),
-            onTap: () {
-              Navigator.pop(context);
-              _showAddToPlaylistSheet(song, controller, playlists);
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.download, color: Colors.white),
-            title: const Text('Download', style: TextStyle(color: Colors.white)),
-            onTap: () {
-              Navigator.pop(context);
-              controller.downloadSong(song);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Downloading ${song.title}...')),
-              );
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.share, color: Colors.white),
-            title: const Text('Share', style: TextStyle(color: Colors.white)),
-            onTap: () {
-              Navigator.pop(context);
-              Share.share(
-                'Check out "${song.title}" by ${song.artist}!',
-                subject: song.title,
-              );
-            },
-          ),
-          const SizedBox(height: 16),
-        ],
-      ),
-    );
-  }
-
-  void _showAddToPlaylistSheet(SongModel song, EnhancedPlayerController controller, List<PlaylistModel> playlists) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: const Color(0xFF1A1A1A),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (context) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const SizedBox(height: 8),
-          Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.grey[600],
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'Add to Playlist',
-            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 16),
-          ListTile(
-            leading: Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: const Color(0xFF2A2A2A),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: const Icon(Icons.add, color: Color(0xFFDC143C)),
-            ),
-            title: const Text('Create New Playlist', style: TextStyle(color: Colors.white)),
-            onTap: () {
-              Navigator.pop(context);
-              _showCreatePlaylistDialog(song, controller);
-            },
-          ),
-          const Divider(color: Colors.grey),
-          if (playlists.isEmpty)
-            Padding(
-              padding: const EdgeInsets.all(32),
-              child: Text(
-                'No playlists yet',
-                style: TextStyle(color: Colors.grey[400]),
-              ),
-            )
-          else
-            SizedBox(
-              height: 200,
-              child: ListView.builder(
-                itemCount: playlists.length,
-                itemBuilder: (context, index) {
-                  final playlist = playlists[index];
-                  final isInPlaylist = playlist.songs.any((s) => s.id == song.id);
-
-                  return ListTile(
-                    leading: ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: playlist.thumbnailUrl != null
-                          ? CachedNetworkImage(
-                              imageUrl: playlist.thumbnailUrl!,
-                              width: 48,
-                              height: 48,
-                              fit: BoxFit.cover,
-                            )
-                          : Container(
-                              width: 48,
-                              height: 48,
-                              color: const Color(0xFF2A2A2A),
-                              child: const Icon(Icons.playlist_play, color: Colors.white54),
-                            ),
-                    ),
-                    title: Text(playlist.name, style: const TextStyle(color: Colors.white)),
-                    subtitle: Text(
-                      '${playlist.songs.length} songs',
-                      style: TextStyle(color: Colors.grey[400]),
-                    ),
-                    trailing: isInPlaylist
-                        ? const Icon(Icons.check_circle, color: Color(0xFFDC143C))
-                        : null,
-                    onTap: () async {
-                      Navigator.pop(context);
-                      if (isInPlaylist) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Song already in this playlist')),
-                        );
-                      } else {
-                        await controller.addSongToPlaylist(playlist.id, song);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Added to "${playlist.name}"')),
-                        );
-                      }
-                    },
-                  );
-                },
-              ),
-            ),
-          const SizedBox(height: 16),
-        ],
-      ),
-    );
-  }
-
-  void _showCreatePlaylistDialog(SongModel song, EnhancedPlayerController controller) {
-    final nameController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A1A),
-        title: const Text('Create Playlist', style: TextStyle(color: Colors.white)),
-        content: TextField(
-          controller: nameController,
-          autofocus: true,
-          style: const TextStyle(color: Colors.white),
-          decoration: InputDecoration(
-            hintText: 'Playlist name',
-            hintStyle: TextStyle(color: Colors.grey[400]),
-            enabledBorder: const UnderlineInputBorder(
-              borderSide: BorderSide(color: Colors.grey),
-            ),
-            focusedBorder: const UnderlineInputBorder(
-              borderSide: BorderSide(color: Color(0xFFDC143C)),
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
-          ),
-          TextButton(
-            onPressed: () async {
-              if (nameController.text.trim().isNotEmpty) {
-                final playlist = await controller.createPlaylist(
-                  nameController.text.trim(),
-                  thumbnailUrl: song.thumbnailUrl,
-                );
-                await controller.addSongToPlaylist(playlist.id, song);
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const SizedBox(height: 12),
+            Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                    color: Colors.grey[800],
+                    borderRadius: BorderRadius.circular(2))),
+            const SizedBox(height: 20),
+            ListTile(
+              leading:
+                  const Icon(Icons.playlist_add_rounded, color: Colors.white),
+              title: const Text('Add to Playlist',
+                  style: TextStyle(color: Colors.white)),
+              onTap: () {
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Created "${nameController.text}" and added song'),
-                    backgroundColor: const Color(0xFFDC143C),
-                  ),
-                );
-              }
-            },
-            child: const Text('Create', style: TextStyle(color: Color(0xFFDC143C))),
-          ),
-        ],
-      ),
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.download_rounded, color: Colors.white),
+              title:
+                  const Text('Download', style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(context);
+                controller.downloadSong(song);
+              },
+            ),
+            const SizedBox(height: 20),
+          ])),
     );
   }
 
-  @override
-  void dispose() {
-    _debounce?.cancel();
-    _searchController.dispose();
-    _focusNode.dispose();
-    _youtubeService.dispose();
-    super.dispose();
+  Widget _buildErrorState() {
+    return Center(
+        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+      Icon(Icons.error_outline_rounded,
+          size: 60, color: Colors.white.withOpacity(0.2)),
+      const SizedBox(height: 16),
+      Text(_error ?? 'Something went wrong',
+          style: const TextStyle(color: Colors.white54)),
+      const SizedBox(height: 24),
+      TextButton(
+        onPressed: () => _performSearch(_searchController.text),
+        child: const Text('Retry', style: TextStyle(color: _accent)),
+      )
+    ]));
   }
 }

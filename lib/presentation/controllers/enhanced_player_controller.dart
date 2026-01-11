@@ -9,6 +9,7 @@ import '../../services/download/download_service.dart';
 import '../../services/playlist/playlist_service.dart';
 import '../../services/offline/offline_manager.dart';
 import '../../services/cache/audio_cache_manager.dart';
+import '../../services/stats/stats_service.dart';
 import '../../core/enums/cache_status.dart';
 
 /// Enhanced player controller using the new bottleneck-resilient architecture.
@@ -25,6 +26,7 @@ class EnhancedPlayerController extends ChangeNotifier {
   final PlaylistService _playlistService;
   final OfflineManager _offlineManager;
   final AudioCacheManager _cacheManager;
+  final StatsService _statsService;
 
   // State
   QueueState _queueState = QueueState.empty;
@@ -37,17 +39,23 @@ class EnhancedPlayerController extends ChangeNotifier {
   // Subscriptions
   final List<StreamSubscription> _subscriptions = [];
 
+  // Tracking
+  Timer? _trackingTimer;
+  static const Duration _trackingInterval = Duration(minutes: 1);
+
   EnhancedPlayerController({
     required EnhancedAudioPlayerService audioService,
     required DownloadService downloadService,
     required PlaylistService playlistService,
     required OfflineManager offlineManager,
     required AudioCacheManager cacheManager,
+    required StatsService statsService,
   })  : _audioService = audioService,
         _downloadService = downloadService,
         _playlistService = playlistService,
         _offlineManager = offlineManager,
-        _cacheManager = cacheManager {
+        _cacheManager = cacheManager,
+        _statsService = statsService {
     _initListeners();
   }
 
@@ -60,8 +68,9 @@ class EnhancedPlayerController extends ChangeNotifier {
 
   PlaybackStatus get playbackStatus => _playbackStatus;
   bool get isPlaying => _playbackStatus == PlaybackStatus.playing;
-  bool get isLoading => _playbackStatus == PlaybackStatus.loading ||
-                        _playbackStatus == PlaybackStatus.buffering;
+  bool get isLoading =>
+      _playbackStatus == PlaybackStatus.loading ||
+      _playbackStatus == PlaybackStatus.buffering;
   bool get isPaused => _playbackStatus == PlaybackStatus.paused;
 
   Duration get position => _position;
@@ -106,6 +115,14 @@ class EnhancedPlayerController extends ChangeNotifier {
     _subscriptions.add(
       _audioService.playbackStatusStream.listen((status) {
         _playbackStatus = status;
+
+        // Handle playback tracking
+        if (status == PlaybackStatus.playing) {
+          _startTracking();
+        } else {
+          _stopTracking();
+        }
+
         notifyListeners();
       }),
     );
@@ -301,8 +318,10 @@ class EnhancedPlayerController extends ChangeNotifier {
   }
 
   /// Create a new playlist.
-  Future<PlaylistModel> createPlaylist(String name, {String? thumbnailUrl}) async {
-    final playlist = await _playlistService.createPlaylist(name, thumbnailUrl: thumbnailUrl);
+  Future<PlaylistModel> createPlaylist(String name,
+      {String? thumbnailUrl}) async {
+    final playlist =
+        await _playlistService.createPlaylist(name, thumbnailUrl: thumbnailUrl);
     notifyListeners();
     return playlist;
   }
@@ -314,15 +333,18 @@ class EnhancedPlayerController extends ChangeNotifier {
   }
 
   /// Add song to playlist.
-  Future<PlaylistModel?> addSongToPlaylist(String playlistId, SongModel song) async {
+  Future<PlaylistModel?> addSongToPlaylist(
+      String playlistId, SongModel song) async {
     final playlist = await _playlistService.addSongToPlaylist(playlistId, song);
     notifyListeners();
     return playlist;
   }
 
   /// Remove song from playlist.
-  Future<PlaylistModel?> removeSongFromPlaylist(String playlistId, String songId) async {
-    final playlist = await _playlistService.removeSongFromPlaylist(playlistId, songId);
+  Future<PlaylistModel?> removeSongFromPlaylist(
+      String playlistId, String songId) async {
+    final playlist =
+        await _playlistService.removeSongFromPlaylist(playlistId, songId);
     notifyListeners();
     return playlist;
   }
@@ -353,10 +375,25 @@ class EnhancedPlayerController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void _startTracking() {
+    _trackingTimer?.cancel();
+    _trackingTimer = Timer.periodic(_trackingInterval, (_) {
+      if (isPlaying) {
+        _statsService.logListeningTime(_trackingInterval);
+      }
+    });
+  }
+
+  void _stopTracking() {
+    _trackingTimer?.cancel();
+    _trackingTimer = null;
+  }
+
   // ========== Cleanup ==========
 
   @override
   void dispose() {
+    _stopTracking();
     for (final sub in _subscriptions) {
       sub.cancel();
     }

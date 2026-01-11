@@ -21,6 +21,9 @@ import '../services/audio/enhanced_audio_player_service.dart';
 // Services - Stream
 import '../services/stream/stream_resolver.dart';
 
+// Services - Stats
+import '../services/stats/stats_service.dart';
+
 // Services - Prefetch
 import '../services/prefetch/prefetch_service.dart';
 
@@ -147,6 +150,7 @@ Future<void> init() async {
       playlistService: sl<PlaylistService>(),
       offlineManager: sl<OfflineManager>(),
       cacheManager: sl<AudioCacheManager>(),
+      statsService: sl<StatsService>(),
     ),
   );
 }

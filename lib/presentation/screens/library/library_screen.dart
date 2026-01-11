@@ -1,12 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
+import 'dart:ui';
+import '../../widgets/animated_list_item.dart';
+import '../../widgets/playing_indicator.dart';
 import '../../../data/models/playlist_model.dart';
 import '../../../data/models/song_model.dart';
 import '../../controllers/enhanced_player_controller.dart';
 import '../playlist/playlist_screen.dart';
-import '../playlist/create_playlist_screen.dart';
 
+/// SakSid Music - Glass Library
+/// Features:
+/// - Custom Glass AppBar
+/// - Animated Tab Switching
+/// - Glass List Cards
 class LibraryScreen extends StatefulWidget {
   const LibraryScreen({super.key});
 
@@ -14,8 +21,10 @@ class LibraryScreen extends StatefulWidget {
   State<LibraryScreen> createState() => _LibraryScreenState();
 }
 
-class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProviderStateMixin {
+class _LibraryScreenState extends State<LibraryScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  static const Color _accent = Color(0xFFE50914);
 
   @override
   void initState() {
@@ -32,32 +41,70 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF000000),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF000000),
-        title: const Text(
-          'Your Library',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: const Color(0xFFDC143C),
-          labelColor: const Color(0xFFDC143C),
-          unselectedLabelColor: Colors.grey,
-          tabs: const [
-            Tab(text: 'Playlists'),
-            Tab(text: 'Favorites'),
-            Tab(text: 'Recent'),
-          ],
+      backgroundColor: Colors.black,
+      extendBodyBehindAppBar: true,
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(110),
+        child: ClipRRect(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+            child: Container(
+              color: Colors.black.withOpacity(0.7),
+              child: SafeArea(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8),
+                      child: Text(
+                        'Library',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                    ),
+                    TabBar(
+                      controller: _tabController,
+                      indicatorColor: _accent,
+                      indicatorSize: TabBarIndicatorSize.label,
+                      indicatorWeight: 3,
+                      labelColor: _accent,
+                      unselectedLabelColor: Colors.white54,
+                      labelStyle: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 15),
+                      tabs: const [
+                        Tab(text: 'Playlists'),
+                        Tab(text: 'Favorites'),
+                        Tab(text: 'History'),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: const [
-          PlaylistsTab(),
-          FavoritesTab(),
-          RecentlyPlayedTab(),
-        ],
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Colors.black, Color(0xFF0F0F0F)],
+          ),
+        ),
+        child: TabBarView(
+          controller: _tabController,
+          physics: const BouncingScrollPhysics(),
+          children: const [
+            PlaylistsTab(),
+            FavoritesTab(),
+            RecentlyPlayedTab(),
+          ],
+        ),
       ),
     );
   }
@@ -72,46 +119,43 @@ class PlaylistsTab extends StatelessWidget {
       builder: (context, controller, child) {
         final playlists = controller.getAllPlaylists();
 
-        return Column(
-          children: [
-            // Create Playlist Button
-            ListTile(
-              leading: Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF2A2A2A),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.add, color: Color(0xFFDC143C), size: 32),
-              ),
-              title: const Text(
-                'Create Playlist',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-              ),
-              subtitle: Text(
-                'Build your own playlist',
-                style: TextStyle(color: Colors.grey[400]),
-              ),
-              onTap: () => _showCreatePlaylistDialog(context, controller),
-            ),
-            const Divider(color: Colors.grey, height: 1),
-            // Playlists List
-            Expanded(
-              child: playlists.isEmpty
-                  ? _buildEmptyState(
-                      icon: Icons.playlist_play,
-                      title: 'No playlists yet',
-                      subtitle: 'Create your first playlist',
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
+        return CustomScrollView(
+          physics: const BouncingScrollPhysics(),
+          slivers: [
+            SliverPadding(
+              padding: const EdgeInsets.only(
+                  top: 120, bottom: 100, left: 16, right: 16),
+              sliver: SliverList(
+                delegate: SliverChildListDelegate([
+                  // Create Playlist Button
+                  _buildCreatePlaylistButton(context, controller),
+                  const SizedBox(height: 16),
+
+                  // Playlist Grid
+                  if (playlists.isEmpty)
+                    _buildEmptyState()
+                  else
+                    GridView.builder(
+                      physics: const NeverScrollableScrollPhysics(),
+                      shrinkWrap: true,
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        childAspectRatio: 0.8,
+                        crossAxisSpacing: 16,
+                        mainAxisSpacing: 16,
+                      ),
                       itemCount: playlists.length,
                       itemBuilder: (context, index) {
-                        final playlist = playlists[index];
-                        return _buildPlaylistTile(context, playlist, controller);
+                        return AnimatedListItem(
+                          index: index,
+                          child: _buildPlaylistCard(
+                              context, playlists[index], controller),
+                        );
                       },
                     ),
+                ]),
+              ),
             ),
           ],
         );
@@ -119,182 +163,162 @@ class PlaylistsTab extends StatelessWidget {
     );
   }
 
-  Widget _buildPlaylistTile(BuildContext context, PlaylistModel playlist, EnhancedPlayerController controller) {
-    return ListTile(
-      leading: ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: playlist.thumbnailUrl != null
-            ? CachedNetworkImage(
-                imageUrl: playlist.thumbnailUrl!,
-                width: 56,
-                height: 56,
-                fit: BoxFit.cover,
-                placeholder: (context, url) => Container(
-                  color: const Color(0xFF2A2A2A),
-                  child: const Icon(Icons.music_note, color: Colors.white54),
-                ),
-                errorWidget: (context, url, error) => Container(
-                  color: const Color(0xFF2A2A2A),
-                  child: const Icon(Icons.music_note, color: Colors.white54),
-                ),
-              )
-            : Container(
-                width: 56,
-                height: 56,
-                color: const Color(0xFF2A2A2A),
-                child: const Icon(Icons.playlist_play, color: Colors.white54),
+  Widget _buildCreatePlaylistButton(
+      BuildContext context, EnhancedPlayerController controller) {
+    return InkWell(
+      onTap: () => _showCreatePlaylistDialog(context, controller),
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white.withOpacity(0.1)),
+        ),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.add_circle_outline_rounded,
+                color: Color(0xFFE50914), size: 28),
+            SizedBox(width: 12),
+            Text(
+              'Create New Playlist',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
               ),
-      ),
-      title: Text(
-        playlist.name,
-        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
-      ),
-      subtitle: Text(
-        '${playlist.songs.length} songs',
-        style: TextStyle(color: Colors.grey[400]),
-      ),
-      trailing: PopupMenuButton<String>(
-        icon: const Icon(Icons.more_vert, color: Colors.white54),
-        color: const Color(0xFF2A2A2A),
-        onSelected: (value) {
-          if (value == 'play') {
-            if (playlist.songs.isNotEmpty) {
-              controller.playPlaylist(playlist.songs);
-            }
-          } else if (value == 'delete') {
-            _showDeleteConfirmation(context, playlist, controller);
-          }
-        },
-        itemBuilder: (context) => [
-          const PopupMenuItem(
-            value: 'play',
-            child: Row(
-              children: [
-                Icon(Icons.play_arrow, color: Colors.white),
-                SizedBox(width: 8),
-                Text('Play', style: TextStyle(color: Colors.white)),
-              ],
             ),
-          ),
-          const PopupMenuItem(
-            value: 'delete',
-            child: Row(
-              children: [
-                Icon(Icons.delete, color: Colors.red),
-                SizedBox(width: 8),
-                Text('Delete', style: TextStyle(color: Colors.red)),
-              ],
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildPlaylistCard(BuildContext context, PlaylistModel playlist,
+      EnhancedPlayerController controller) {
+    return GestureDetector(
       onTap: () {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => PlaylistScreen(playlist: playlist),
-          ),
+              builder: (context) => PlaylistScreen(playlist: playlist)),
         );
       },
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white.withOpacity(0.05)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: ClipRRect(
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(20)),
+                child: playlist.thumbnailUrl != null
+                    ? CachedNetworkImage(
+                        imageUrl: playlist.thumbnailUrl!,
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        placeholder: (_, __) =>
+                            Container(color: Colors.grey[900]),
+                      )
+                    : Container(
+                        color: Colors.grey[900],
+                        child: const Center(
+                          child: Icon(Icons.playlist_play_rounded,
+                              size: 48, color: Colors.white24),
+                        ),
+                      ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    playlist.name,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${playlist.songs.length} Tracks',
+                    style: TextStyle(
+                        color: Colors.white.withOpacity(0.5), fontSize: 13),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
-  void _showCreatePlaylistDialog(BuildContext context, EnhancedPlayerController controller) {
-    final nameController = TextEditingController();
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.only(top: 60),
+        child: Column(
+          children: [
+            Icon(Icons.music_note_rounded,
+                size: 64, color: Colors.white.withOpacity(0.1)),
+            const SizedBox(height: 16),
+            Text(
+              'Your collection is empty',
+              style: TextStyle(color: Colors.white.withOpacity(0.4)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
+  void _showCreatePlaylistDialog(
+      BuildContext context, EnhancedPlayerController controller) {
+    final nameController = TextEditingController();
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF1A1A1A),
-        title: const Text('Create Playlist', style: TextStyle(color: Colors.white)),
+        title:
+            const Text('New Playlist', style: TextStyle(color: Colors.white)),
         content: TextField(
           controller: nameController,
-          autofocus: true,
           style: const TextStyle(color: Colors.white),
-          decoration: InputDecoration(
-            hintText: 'Playlist name',
-            hintStyle: TextStyle(color: Colors.grey[400]),
-            enabledBorder: const UnderlineInputBorder(
-              borderSide: BorderSide(color: Colors.grey),
-            ),
-            focusedBorder: const UnderlineInputBorder(
-              borderSide: BorderSide(color: Color(0xFFDC143C)),
-            ),
+          decoration: const InputDecoration(
+            hintText: 'Name',
+            hintStyle: TextStyle(color: Colors.grey),
+            enabledBorder: UnderlineInputBorder(
+                borderSide: BorderSide(color: Colors.grey)),
+            focusedBorder: UnderlineInputBorder(
+                borderSide: BorderSide(color: Color(0xFFE50914))),
           ),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
-          ),
+              onPressed: () => Navigator.pop(context),
+              child:
+                  const Text('Cancel', style: TextStyle(color: Colors.grey))),
           TextButton(
             onPressed: () async {
-              if (nameController.text.trim().isNotEmpty) {
-                await controller.createPlaylist(nameController.text.trim());
+              if (nameController.text.isNotEmpty) {
+                await controller.createPlaylist(nameController.text);
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Playlist "${nameController.text}" created'),
-                    backgroundColor: const Color(0xFFDC143C),
-                  ),
-                );
               }
             },
-            child: const Text('Create', style: TextStyle(color: Color(0xFFDC143C))),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showDeleteConfirmation(BuildContext context, PlaylistModel playlist, EnhancedPlayerController controller) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A1A),
-        title: const Text('Delete Playlist', style: TextStyle(color: Colors.white)),
-        content: Text(
-          'Are you sure you want to delete "${playlist.name}"?',
-          style: TextStyle(color: Colors.grey[300]),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
-          ),
-          TextButton(
-            onPressed: () async {
-              await controller.deletePlaylist(playlist.id);
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Playlist deleted'),
-                  backgroundColor: Color(0xFFDC143C),
-                ),
-              );
-            },
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEmptyState({required IconData icon, required String title, required String subtitle}) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 64, color: Colors.grey[600]),
-          const SizedBox(height: 16),
-          Text(
-            title,
-            style: TextStyle(color: Colors.grey[400], fontSize: 18, fontWeight: FontWeight.w500),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            subtitle,
-            style: TextStyle(color: Colors.grey[600], fontSize: 14),
+            child: const Text('Create',
+                style: TextStyle(color: Color(0xFFE50914))),
           ),
         ],
       ),
@@ -316,114 +340,117 @@ class FavoritesTab extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.favorite_border, size: 64, color: Colors.grey[600]),
+                Icon(Icons.favorite_rounded,
+                    size: 80, color: Colors.white.withOpacity(0.1)),
                 const SizedBox(height: 16),
-                Text(
-                  'No favorite songs',
-                  style: TextStyle(color: Colors.grey[400], fontSize: 18, fontWeight: FontWeight.w500),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Tap the heart icon to add favorites',
-                  style: TextStyle(color: Colors.grey[600], fontSize: 14),
-                ),
+                Text('No favorites yet',
+                    style: TextStyle(color: Colors.white.withOpacity(0.5))),
               ],
             ),
           );
         }
 
-        return Column(
-          children: [
-            // Play All Button
-            if (favorites.isNotEmpty)
-              ListTile(
-                leading: Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [const Color(0xFFDC143C), const Color(0xFF8B0000)],
-                    ),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.play_arrow, color: Colors.white, size: 32),
-                ),
-                title: const Text(
-                  'Play All',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-                ),
-                subtitle: Text(
-                  '${favorites.length} songs',
-                  style: TextStyle(color: Colors.grey[400]),
-                ),
-                onTap: () => controller.playPlaylist(favorites),
-              ),
-            const Divider(color: Colors.grey, height: 1),
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                itemCount: favorites.length,
-                itemBuilder: (context, index) {
-                  final song = favorites[index];
-                  return _buildSongTile(context, song, favorites, index, controller);
-                },
-              ),
-            ),
-          ],
+        return ListView.builder(
+          padding: const EdgeInsets.only(top: 120, bottom: 100),
+          physics: const BouncingScrollPhysics(),
+          itemCount: favorites.length,
+          itemBuilder: (context, index) {
+            return AnimatedListItem(
+              index: index,
+              child: _buildSongTile(
+                  context, favorites[index], favorites, index, controller),
+            );
+          },
         );
       },
     );
   }
 
-  Widget _buildSongTile(BuildContext context, SongModel song, List<SongModel> songs, int index, EnhancedPlayerController controller) {
+  Widget _buildSongTile(BuildContext context, SongModel song,
+      List<SongModel> songs, int index, EnhancedPlayerController controller) {
     final isCurrentSong = controller.currentSong?.id == song.id;
-
-    return ListTile(
-      leading: ClipRRect(
-        borderRadius: BorderRadius.circular(4),
-        child: CachedNetworkImage(
-          imageUrl: song.thumbnailUrl,
-          width: 56,
-          height: 56,
-          fit: BoxFit.cover,
-          placeholder: (context, url) => Container(
-            color: Colors.grey[800],
-            child: const Icon(Icons.music_note, color: Colors.white54),
-          ),
-          errorWidget: (context, url, error) => Container(
-            color: Colors.grey[800],
-            child: const Icon(Icons.music_note, color: Colors.white54),
-          ),
-        ),
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      decoration: BoxDecoration(
+        color: isCurrentSong
+            ? const Color(0xFFE50914).withOpacity(0.1)
+            : Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: isCurrentSong
+            ? Border.all(color: const Color(0xFFE50914).withOpacity(0.3))
+            : null,
       ),
-      title: Text(
-        song.title,
-        style: TextStyle(
-          color: isCurrentSong ? const Color(0xFFDC143C) : Colors.white,
-          fontWeight: FontWeight.w500,
-        ),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      subtitle: Text(
-        song.artist,
-        style: TextStyle(color: Colors.grey[400]),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      trailing: IconButton(
-        icon: const Icon(Icons.favorite, color: Color(0xFFDC143C)),
-        onPressed: () async {
-          await controller.toggleFavorite(song);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Removed from favorites'),
-              duration: Duration(seconds: 1),
+      child: ListTile(
+        contentPadding: const EdgeInsets.all(8),
+        leading: Stack(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: CachedNetworkImage(
+                imageUrl: song.thumbnailUrl,
+                width: 56,
+                height: 56,
+                fit: BoxFit.cover,
+              ),
             ),
-          );
-        },
+            if (isCurrentSong && controller.isPlaying)
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Center(
+                  child: PlayingIndicator(size: 20, color: Color(0xFFE50914)),
+                ),
+              ),
+          ],
+        ),
+        title: Row(
+          children: [
+            if (isCurrentSong)
+              Container(
+                margin: const EdgeInsets.only(right: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE50914).withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(
+                      color: const Color(0xFFE50914).withOpacity(0.5),
+                      width: 0.5),
+                ),
+                child: const Text(
+                  'PLAYING',
+                  style: TextStyle(
+                    color: Color(0xFFE50914),
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            Expanded(
+              child: Text(
+                song.title,
+                style: TextStyle(
+                  color: isCurrentSong ? const Color(0xFFE50914) : Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+        subtitle: Text(song.artist,
+            style: TextStyle(color: Colors.white.withOpacity(0.6)),
+            maxLines: 1),
+        trailing: IconButton(
+          icon: const Icon(Icons.favorite_rounded, color: Color(0xFFE50914)),
+          onPressed: () => controller.toggleFavorite(song),
+        ),
+        onTap: () => controller.playPlaylist(songs, startIndex: index),
       ),
-      onTap: () => controller.playPlaylist(songs, startIndex: index),
     );
   }
 }
@@ -434,154 +461,54 @@ class RecentlyPlayedTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Consumer<EnhancedPlayerController>(
-      builder: (context, controller, child) {
-        final recentSongs = controller.getRecentlyPlayed();
+        builder: (context, controller, child) {
+      final history = controller.getRecentlyPlayed();
+      if (history.isEmpty) {
+        return Center(
+            child: Text('No listening history',
+                style: TextStyle(color: Colors.white.withOpacity(0.5))));
+      }
 
-        if (recentSongs.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.history, size: 64, color: Colors.grey[600]),
-                const SizedBox(height: 16),
-                Text(
-                  'No recently played',
-                  style: TextStyle(color: Colors.grey[400], fontSize: 18, fontWeight: FontWeight.w500),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Start playing music to see history',
-                  style: TextStyle(color: Colors.grey[600], fontSize: 14),
-                ),
-              ],
-            ),
-          );
-        }
-
-        return Column(
-          children: [
-            // Clear History Button
-            ListTile(
-              leading: Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF2A2A2A),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.clear_all, color: Colors.white54, size: 32),
-              ),
-              title: const Text(
-                'Clear History',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-              ),
-              subtitle: Text(
-                '${recentSongs.length} songs',
-                style: TextStyle(color: Colors.grey[400]),
-              ),
-              onTap: () => _showClearConfirmation(context, controller),
-            ),
-            const Divider(color: Colors.grey, height: 1),
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                itemCount: recentSongs.length,
-                itemBuilder: (context, index) {
-                  final song = recentSongs[index];
-                  return _buildSongTile(context, song, recentSongs, index, controller);
-                },
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildSongTile(BuildContext context, SongModel song, List<SongModel> songs, int index, EnhancedPlayerController controller) {
-    final isCurrentSong = controller.currentSong?.id == song.id;
-
-    return ListTile(
-      leading: ClipRRect(
-        borderRadius: BorderRadius.circular(4),
-        child: CachedNetworkImage(
-          imageUrl: song.thumbnailUrl,
-          width: 56,
-          height: 56,
-          fit: BoxFit.cover,
-          placeholder: (context, url) => Container(
-            color: Colors.grey[800],
-            child: const Icon(Icons.music_note, color: Colors.white54),
-          ),
-          errorWidget: (context, url, error) => Container(
-            color: Colors.grey[800],
-            child: const Icon(Icons.music_note, color: Colors.white54),
-          ),
-        ),
-      ),
-      title: Text(
-        song.title,
-        style: TextStyle(
-          color: isCurrentSong ? const Color(0xFFDC143C) : Colors.white,
-          fontWeight: FontWeight.w500,
-        ),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      subtitle: Text(
-        song.artist,
-        style: TextStyle(color: Colors.grey[400]),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      trailing: IconButton(
-        icon: Icon(
-          controller.isFavorite(song.id) ? Icons.favorite : Icons.favorite_border,
-          color: controller.isFavorite(song.id) ? const Color(0xFFDC143C) : Colors.white54,
-        ),
-        onPressed: () async {
-          final isFav = await controller.toggleFavorite(song);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(isFav ? 'Added to favorites' : 'Removed from favorites'),
-              duration: const Duration(seconds: 1),
-            ),
+      return ListView.builder(
+        padding: const EdgeInsets.only(top: 120, bottom: 100),
+        physics: const BouncingScrollPhysics(),
+        itemCount: history.length,
+        itemBuilder: (context, index) {
+          return AnimatedListItem(
+            index: index,
+            child:
+                _buildHistoryTile(history[index], history, index, controller),
           );
         },
-      ),
-      onTap: () => controller.playPlaylist(songs, startIndex: index),
-    );
+      );
+    });
   }
 
-  void _showClearConfirmation(BuildContext context, EnhancedPlayerController controller) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A1A),
-        title: const Text('Clear History', style: TextStyle(color: Colors.white)),
-        content: Text(
-          'Are you sure you want to clear your recently played history?',
-          style: TextStyle(color: Colors.grey[300]),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
-          ),
-          TextButton(
-            onPressed: () async {
-              await controller.clearRecentlyPlayed();
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('History cleared'),
-                  backgroundColor: Color(0xFFDC143C),
-                ),
-              );
-            },
-            child: const Text('Clear', style: TextStyle(color: Colors.red)),
-          ),
-        ],
+  Widget _buildHistoryTile(SongModel song, List<SongModel> songs, int index,
+      EnhancedPlayerController controller) {
+    final isCurrentSong = controller.currentSong?.id == song.id;
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      decoration: isCurrentSong
+          ? BoxDecoration(
+              color: const Color(0xFFE50914).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+              border:
+                  Border.all(color: const Color(0xFFE50914).withOpacity(0.3)),
+            )
+          : null,
+      child: ListTile(
+        leading: isCurrentSong
+            ? const PlayingIndicator(size: 20, color: Color(0xFFE50914))
+            : Icon(Icons.history_rounded, color: Colors.white.withOpacity(0.3)),
+        title: Text(song.title,
+            style: TextStyle(
+                color: isCurrentSong ? const Color(0xFFE50914) : Colors.white,
+                fontWeight:
+                    isCurrentSong ? FontWeight.bold : FontWeight.normal)),
+        subtitle: Text(song.artist,
+            style: TextStyle(color: Colors.white.withOpacity(0.5))),
+        onTap: () => controller.playPlaylist(songs, startIndex: index),
       ),
     );
   }

@@ -6,6 +6,7 @@ class DatabaseService {
   static const String songsBoxName = 'songs';
   static const String playlistsBoxName = 'playlists';
   static const String settingsBoxName = 'settings';
+  static const String statsBoxName = 'stats';
 
   Future<void> init() async {
     // Register adapters
@@ -15,11 +16,14 @@ class DatabaseService {
     await Hive.openBox<SongModel>(songsBoxName);
     await Hive.openBox<PlaylistModel>(playlistsBoxName);
     await Hive.openBox(settingsBoxName);
+    await Hive.openBox(statsBoxName);
   }
 
   Box<SongModel> get songsBox => Hive.box<SongModel>(songsBoxName);
-  Box<PlaylistModel> get playlistsBox => Hive.box<PlaylistModel>(playlistsBoxName);
+  Box<PlaylistModel> get playlistsBox =>
+      Hive.box<PlaylistModel>(playlistsBoxName);
   Box get settingsBox => Hive.box(settingsBoxName);
+  Box get statsBox => Hive.box(statsBoxName);
 
   // Methods to interact with DB
   Future<void> saveSong(SongModel song) async {

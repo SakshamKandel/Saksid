@@ -15,6 +15,10 @@ import '../core/utils/rate_limiter.dart';
 // Services - Cache
 import '../services/cache/audio_cache_manager.dart';
 
+// Services - Stats
+import '../services/stats/stats_service.dart';
+import '../data/datasources/local/database_service.dart';
+
 // Services - Audio
 import '../services/audio/audio_player_service.dart';
 import '../services/audio/enhanced_audio_player_service.dart';
@@ -55,6 +59,15 @@ Future<void> init() async {
 
   // ===== Data Sources =====
   sl.registerLazySingleton<YouTubeService>(() => YouTubeService());
+
+  // ===== Database Service =====
+  final databaseService = DatabaseService();
+  await databaseService.init();
+  sl.registerLazySingleton<DatabaseService>(() => databaseService);
+
+  // ===== Stats Service =====
+  sl.registerLazySingleton<StatsService>(
+      () => StatsService(sl<DatabaseService>()));
 
   // ===== Cache Services =====
   final audioCacheManager = AudioCacheManager(
@@ -162,6 +175,7 @@ Future<void> init() async {
       playlistService: sl<PlaylistService>(),
       offlineManager: sl<OfflineManager>(),
       cacheManager: sl<AudioCacheManager>(),
+      statsService: sl<StatsService>(),
     ),
   );
 }
