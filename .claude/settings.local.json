@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd:*)",
+      "Bash(tree:*)",
+      "Bash(flutter run:*)",
+      "Bash(flutter pub add:*)",
+      "Bash(powershell -Command \"\\(Get-Content ''lib/app.dart''\\) -replace ''player_controller.dart'', ''enhanced_player_controller.dart'' -replace ''PlayerController'', ''EnhancedPlayerController'' | Set-Content ''lib/app.dart''\")",
+      "Bash(find:*)",
+      "Bash(for file in lib/presentation/screens/downloads/downloads_screen.dart lib/presentation/screens/home/home_screen.dart lib/presentation/screens/library/library_screen.dart lib/presentation/screens/player/mini_player.dart lib/presentation/screens/player/player_screen.dart lib/presentation/screens/playlist/playlist_screen.dart lib/presentation/screens/search/search_screen.dart lib/presentation/screens/settings/settings_screen.dart)",
+      "Bash(do sed -i 's|player_controller.dart|enhanced_player_controller.dart|g' \"$file\")",
+      "Bash(done)",
+      "Bash(flutter analyze:*)",
+      "Bash(dart analyze:*)",
+      "Bash(grep:*)",
+      "Bash(ls:*)",
+      "Bash(dir)"
+    ]
+  }
+}
